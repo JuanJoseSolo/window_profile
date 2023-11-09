@@ -1,1 +1,317 @@
 You will be able to add the new information about your own w10 profile configuration.
+
+Clear-Host #clear the console every time when the script is called.
+
+#--------- MAIN FUNCTION <prompt> -----------#
+function prompt {
+	<#
+	This function provides a new visualization of the PowerShell interface.
+	#>
+	$Host.UI.RawUI.WindowTitle = (Get-Location).Path
+	Set-PSReadLineOption -Colors @{ Command = 'green' }
+	$currentDir = (Convert-Path .)
+
+	if ($currentDir.Contains($HOME)) 
+	{
+		$currentDir = $currentDir.Replace($HOME, "~ ")
+	}
+	if (Test-Path .git) {
+		Write-Host ("" + $currentDir + "\\") -NoNewLine `
+		-ForegroundColor 13
+		Write-BranchName
+		Write-Host ("-->") -NoNewLine `
+		-ForegroundColor 10
+			return " "
+    }
+	else
+	{
+		Write-Host ("" + $currentDir+"\\") -NoNewLine `
+		-ForegroundColor 13
+		Write-BranchName
+		Write-Host ("-->") -NoNewLine `
+		-ForegroundColor 10
+			return " "
+	}	    
+}
+#-------- GIT FUNCTIONS --------#
+function Write-BranchName () {
+	$marks = "<{}>";
+    try {
+        $branch = git rev-parse --abbrev-ref HEAD
+		if($null -eq $branch){$marks = ""}
+        if ($branch -eq "HEAD") 
+		{
+            # we're probably in detached HEAD state, so print the SHA
+            $branch = git rev-parse --short HEAD
+            Write-Host $marks.Replace("{}",$branch) -ForegroundColor "red" -NoNewLine `
+        }
+        else 
+		{
+            # we're on an actual branch, so print it
+			if(git status --porcelain | where {$_ -match '^\?\?' })
+			{
+				# Untracked files exist
+				Write-Host $marks.Replace("{}","**$branch") -ForegroundColor "blue" -NoNewLine `
+			}
+			elseif(git status --porcelain | where {$_ -notmatch '^\?\?'})
+			{
+				# uncommitted changes
+				Write-Host $marks.Replace("{}","++$branch") -ForegroundColor "blue" -NoNewLine `
+			}
+			else
+			{
+				# tree is clean
+				Write-Host $marks.Replace("{}",$branch) -ForegroundColor "blue" -NoNewLine `
+			}
+        }
+    } 
+	catch 
+	{
+        # we'll end up here if we're in a newly initiated git repo
+        Write-Host "<no branches yet>" -ForegroundColor "yellow" -NoNewLine `
+    }
+}
+function mbr{
+	$br_name = git rev-parse --abbrev-ref HEAD
+	return $br_name
+}
+function bra {
+	$all_branches = git branch -a
+	$idx = 0 
+	$branches_name = @()
+	foreach($br in $all_branches)
+	{
+		Write-Host $idx ':' $br -ForegroundColor "green" 
+		$branches_name += $br
+		$idx = $idx + 1
+	}
+	set-bra($branches_name)
+}
+function set-bra($branches) {
+	
+	$idx = read-host "select branch"
+	if($idx)
+	{
+		if($branches[$idx].Contains("*"))
+		{
+			$branch = $branches[$idx].replace("* ","")
+		}else
+		{
+			$branch = $branches[$idx].replace("remotes/origin/","")
+		}
+		Set-Clipboard $branch.Trim()
+	}
+}
+
+function repo($repo) {
+	try {
+		$repo=$repo.ToUpper()  
+		$None=$false
+	}
+	catch {
+		echo "Which repo???"
+		$None=$true
+	}
+	if(-not $None){
+	    if($repo.Contains("G80"))
+	    {
+	        return 'https://github.vitesco.io/EnDS-Test-Automation/VT.PRJ.GM.G80.CVR.git'
+	    }
+	    elseif($repo.Contains("G70")) 
+	    {
+	        return 'https://github.vitesco.io/EnDS-Test-Automation/VT.PRJ.GM.G70.CVR.git'
+	    }
+	    elseif($repo.Contains("FC1")) 
+	    {
+	        return 'https://github.vitesco.io/EnDS-Test-Automation/VT.PRJ.FORD.FC1.REGR_TEST.git'
+	    }
+	    elseif($repo.Contains("FB0"))
+	    {
+	        return 'https://github.vitesco.io/EnDS-Test-Automation/VT.PRJ.FORD.FB0.REGR_TEST.git'
+	    }
+	    elseif ($repo.Contains("FB1")) {
+	        return 'https://gitlab-ec-na.aws1583.vitesco.io/ec/se/aet/tas/ford/fofb0_ta_suite.git'
+	    }
+		elseif($repo.Contains("E42A")){
+			return 'https://github.vitesco.io/EnDS-Test-Automation/VT.PRJ.GM.G55.FAST.git'
+		}
+	    else{echo "Repository don't found !!!!!!!!!"}
+	}
+}
+
+function ignore{
+	$ignore_list = @("work/ta/cnf/cnf_prj/devices_cnf/cnf_cal_dev.xml","work/ta/cnf/cnf_prj/devices_cnf/cnf_deb_dev.xml","work/ta/cnf/cnf_prj/devices_cnf/cnf_fiu_dev.xml","work/ta/cnf/cnf_prj/devices_cnf/cnf_hil_dev.xml","work/ta/cnf/cnf_prj/testenv_cnf/cnf_testpath.py","work/ta/cnf/cnf_prj/testenv_cnf/cnf_uut_info.xml")
+	foreach($file in $ignore_list){
+		echo "remove $file"
+		git checkout $file
+	}
+	del-pyc
+}
+
+function git-push($c,$add){
+	ignore
+	git fetch
+	git pull
+	if($null -ne $c){
+    	if($null -ne $add){
+    	    git add $add
+    	}
+    	else{
+    	    git add .
+    	}
+    git commit -am $c
+    echo "committing -> '$c'"
+    git push origin (mbr)
+	}
+	else {
+		echo "push command needs to have a commit!!!"
+	}
+}
+
+#------- Helpers ------#
+
+function del-pyc {
+	$command = "del *.pyc /s"
+	Start-Process -NoNewWindow -FilePath "cmd.exe" -ArgumentList "/C", $command 2> $null
+	clear
+}
+
+function ta($release){
+	cd d:/p_ta3/
+	$location=whereis -item $release -verbose $false
+	cd $location
+}
+
+function mklink ($target, $link){
+	New-Item -Force -Path $link -ItemType SymbolicLink -Value $target
+}
+function b($n){
+
+	$back_patern = '../'
+	$multiplier = $n
+	# Empty string to store the result.
+	$total_back = ''
+
+	if($null -eq $n){
+		Set-Location $back_patern
+	}
+	else{
+		# Repeating the string.
+		for ($i = 1; $i -le $multiplier; $i++) {
+		    $total_back += $back_patern
+		}
+		Set-Location $total_back
+	}
+}
+function ll {
+	Get-ChildItem -Force | Sort-Object Extension
+}
+function note ($file){
+	C:\LegacyApp\Notepad++\notepad++.exe $file
+}
+function re {
+	powershell.exe
+}
+function py($version, $window){
+	if($null -eq $window){
+	    if($null -eq $version -or '2' -eq $version){
+	    	powershell "C:\LegacyApp\Python27_x64\py2.exe"
+	    }
+	    elseif('3' -eq $version){
+	    	powershell "C:\LegacyApp\Python36\python3.exe"
+	    }
+	    elseif('39' -eq $version){
+	    	powershell "C:\LegacyApp\Python39\py3.exe"
+	    }
+	}else{
+		if($null -eq $version -or '2' -eq $version){
+	    	start "C:\LegacyApp\Python27_x64\py2.exe"
+	    }
+	    elseif('3' -eq $version){
+	    	start "C:\LegacyApp\Python36\python3.exe"
+	    }
+	    elseif('39' -eq $version){
+	    	start "C:\LegacyApp\Python39\py3.exe"
+	    }
+	}
+}
+function eclipse ($file){
+	if($null -eq $file){
+		start "C:\LegacyApp\Eclipse_Contest\eclipse.exe"
+	}
+	else{
+		start "C:\LegacyApp\Eclipse_Contest\eclipse.exe" $file
+	}
+}
+function delete ($item){
+rm -Force -Recurse $item
+}
+function vi ($file){
+	if($file.Contains('.\')){$file=$file.replace('.\','')}
+	$temp_path = pwd
+	cd "C:\Program Files\Git\usr\bin\" 
+	.\vim.exe "$temp_path\$file"
+	cd $temp_path.path
+}
+#####################################################
+#get the parameters by console line
+#####################################################
+function whereis($item, $path, $verbose = $true){
+#others files
+	if($null -ne $item -And $null -eq $path -And $verbose -eq $true)
+	{
+		Write-Output "
+		------------- Searching for < $item > -------------
+		----- you can stop the search using 'ctr+c' -----
+	searching...
+	"
+		$path = Get-ChildItem -Filter $item -Recurse 2> $null
+	}
+	elseif($null -ne $item -And $null -ne $path)
+	{
+		Write-Output "
+		------------- Searching for < $item > --------------
+		----- you can stop the search using 'ctr+c' ------
+	searching...
+	"
+		$path = Get-ChildItem -Path $path -Filter $item -Recurse 2> $null
+	}
+	elseif($null -ne $item -And $null -eq $path -And $verbose -eq $false)
+	{
+		$path = Get-ChildItem -Filter $item -Recurse 2> $null
+	}	
+	else
+	{
+		Write-Host '
+		'
+		help $MyInvocation.MyCommand.Name
+		write-host "Parameters:
+		-item:: the file that you want to search
+		-path:: the location where you want to search
+		-verbose:: it shows the information
+		"
+	}
+	if($verbose -eq $false){
+		return $path.FullName
+	}
+	if($verbose -And $path)
+	{
+		$allpaths = $path.FullName
+		Set-Clipboard $allpaths
+		echo "Found at:"
+		foreach($found in $allpaths)
+		{
+			echo "  $found"
+		}
+		echo "
+		"
+	}
+	elseif ($path) 
+	{
+		Set-Clipboard $path.FullName
+		echo 'All was copied on clipboard !!!
+		'
+	}
+	else{echo " $item NOT FOUND !!!!!
+	"}
+}
